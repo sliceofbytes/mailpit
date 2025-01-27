@@ -4,8 +4,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/smtp"
-	"strings"
+    "mime"
+    "net/smtp"
+    "strings"
 
 	"github.com/axllent/mailpit/config"
 	"github.com/axllent/mailpit/internal/logger"
@@ -14,49 +15,102 @@ import (
 
 // Wrapper to auto relay messages if configured
 func autoRelayMessage(from string, to []string, data *[]byte) {
-	if config.SMTPRelayConfig.BlockedRecipientsRegexp != nil {
-		filteredTo := []string{}
-		for _, address := range to {
-			if config.SMTPRelayConfig.BlockedRecipientsRegexp.MatchString(address) {
-				logger.Log().Debugf("[relay] ignoring auto-relay to %s: found in blocklist", address)
-				continue
-			}
+    // Extract subject
+    subject := extractSubject(*data)
 
-			filteredTo = append(filteredTo, address)
-		}
-		to = filteredTo
-	}
+    // Check blocked subjects first - applies to ALL relay attempts
+    if config.SMTPRelayConfig.BlockedSubjectsRegexp != nil {
+        if config.SMTPRelayConfig.BlockedSubjectsRegexp.MatchString(subject) {
+            logger.Log().Debugf("[relay] ignoring auto-relay: subject '%s' found in blocklist", subject)
+            return
+        }
+    }
 
-	if len(to) == 0 {
-		return
-	}
+    // Check allowed subjects if configured - applies to ALL relay attempts
+    if config.SMTPRelayConfig.AllowedSubjectsRegexp != nil {
+        if !config.SMTPRelayConfig.AllowedSubjectsRegexp.MatchString(subject) {
+            logger.Log().Debugf("[relay] ignoring auto-relay: subject '%s' not in allowlist", subject)
+            return
+        }
+    }
 
-	if config.SMTPRelayAll {
-		if err := Relay(from, to, *data); err != nil {
-			logger.Log().Errorf("[relay] error: %s", err.Error())
-		} else {
-			logger.Log().Debugf("[relay] sent message to %s from %s via %s:%d",
-				strings.Join(to, ", "), from, config.SMTPRelayConfig.Host, config.SMTPRelayConfig.Port)
-		}
-	} else if config.SMTPRelayMatchingRegexp != nil {
-		filtered := []string{}
-		for _, t := range to {
-			if config.SMTPRelayMatchingRegexp.MatchString(t) {
-				filtered = append(filtered, t)
-			}
-		}
+    // Now check recipients
+    if config.SMTPRelayConfig.BlockedRecipientsRegexp != nil {
+        filteredTo := []string{}
+        for _, address := range to {
+            if config.SMTPRelayConfig.BlockedRecipientsRegexp.MatchString(address) {
+                logger.Log().Debugf("[relay] ignoring auto-relay to %s: found in blocklist", address)
+                continue
+            }
+            filteredTo = append(filteredTo, address)
+        }
+        to = filteredTo
+    }
 
-		if len(filtered) == 0 {
-			return
-		}
+    if len(to) == 0 {
+        return
+    }
 
-		if err := Relay(from, filtered, *data); err != nil {
-			logger.Log().Errorf("[relay] error: %s", err.Error())
-		} else {
-			logger.Log().Debugf("[relay] auto-relay message to %s from %s via %s:%d",
-				strings.Join(filtered, ", "), from, config.SMTPRelayConfig.Host, config.SMTPRelayConfig.Port)
-		}
-	}
+    // Handle relay based on configuration
+    if config.SMTPRelayAll {
+        if err := Relay(from, to, *data); err != nil {
+            logger.Log().Errorf("[relay] error: %s", err.Error())
+        } else {
+            logger.Log().Debugf("[relay] sent message to %s from %s via %s:%d",
+                strings.Join(to, ", "), from, config.SMTPRelayConfig.Host, config.SMTPRelayConfig.Port)
+        }
+        return
+    }
+
+    if config.SMTPRelayMatchingRegexp != nil {
+        filtered := []string{}
+        for _, t := range to {
+            if config.SMTPRelayMatchingRegexp.MatchString(t) {
+                filtered = append(filtered, t)
+            }
+        }
+
+        if len(filtered) == 0 {
+            return
+        }
+
+        if err := Relay(from, filtered, *data); err != nil {
+            logger.Log().Errorf("[relay] error: %s", err.Error())
+        } else {
+            logger.Log().Debugf("[relay] auto-relay message to %s from %s via %s:%d",
+                strings.Join(filtered, ", "), from, config.SMTPRelayConfig.Host, config.SMTPRelayConfig.Port)
+        }
+    }
+}
+
+// extractSubject extracts and decodes the subject from email data
+func extractSubject(data []byte) string {
+    content := string(data)
+    lines := strings.Split(content, "\n")
+    for _, line := range lines {
+        line = strings.TrimSpace(line)
+        if strings.HasPrefix(strings.ToLower(line), "subject:") {
+            subject := strings.TrimPrefix(line, "Subject:")
+            subject = strings.TrimPrefix(subject, "subject:")
+            subject = strings.TrimSpace(subject)
+            
+            // Log the raw subject
+            logger.Log().Debugf("[relay] raw subject before decode: '%s'", subject)
+            
+            // Decode the subject
+            dec := new(mime.WordDecoder)
+            decoded, err := dec.DecodeHeader(subject)
+            if err != nil {
+                logger.Log().Warnf("[relay] failed to decode subject: %s", err.Error())
+                return subject // Return original if decode fails
+            }
+            
+            // Log the decoded subject
+            logger.Log().Debugf("[relay] decoded subject: '%s'", decoded)
+            return decoded
+        }
+    }
+    return ""
 }
 
 // Relay will connect to a pre-configured SMTP server and send a message to one or more recipients.

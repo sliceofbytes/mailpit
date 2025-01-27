@@ -84,72 +84,94 @@ func parseRelayConfig(c string) error {
 	return nil
 }
 
-// Validate the SMTPRelayConfig (if Host is set)
+
+
 func validateRelayConfig() error {
-	if SMTPRelayConfig.Host == "" {
-		return nil
-	}
+    if SMTPRelayConfig.Host == "" {
+        return nil
+    }
 
-	if SMTPRelayConfig.Port == 0 {
-		SMTPRelayConfig.Port = 25 // default
-	}
+    if SMTPRelayConfig.Port == 0 {
+        SMTPRelayConfig.Port = 25 // default
+    }
 
-	SMTPRelayConfig.Auth = strings.ToLower(SMTPRelayConfig.Auth)
+    SMTPRelayConfig.Auth = strings.ToLower(SMTPRelayConfig.Auth)
 
-	if SMTPRelayConfig.Auth == "" || SMTPRelayConfig.Auth == "none" || SMTPRelayConfig.Auth == "false" {
-		SMTPRelayConfig.Auth = "none"
-	} else if SMTPRelayConfig.Auth == "plain" {
-		if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Password == "" {
-			return fmt.Errorf("[relay] host username or password not set for PLAIN authentication")
-		}
-	} else if SMTPRelayConfig.Auth == "login" {
-		SMTPRelayConfig.Auth = "login"
-		if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Password == "" {
-			return fmt.Errorf("[relay] host username or password not set for LOGIN authentication")
-		}
-	} else if strings.HasPrefix(SMTPRelayConfig.Auth, "cram") {
-		SMTPRelayConfig.Auth = "cram-md5"
-		if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Secret == "" {
-			return fmt.Errorf("[relay] host username or secret not set for CRAM-MD5 authentication")
-		}
-	} else {
-		return fmt.Errorf("[relay] authentication method not supported: %s", SMTPRelayConfig.Auth)
-	}
+    if SMTPRelayConfig.Auth == "" || SMTPRelayConfig.Auth == "none" || SMTPRelayConfig.Auth == "false" {
+        SMTPRelayConfig.Auth = "none"
+    } else if SMTPRelayConfig.Auth == "plain" {
+        if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Password == "" {
+            return fmt.Errorf("[relay] host username or password not set for PLAIN authentication")
+        }
+    } else if SMTPRelayConfig.Auth == "login" {
+        SMTPRelayConfig.Auth = "login"
+        if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Password == "" {
+            return fmt.Errorf("[relay] host username or password not set for LOGIN authentication")
+        }
+    } else if strings.HasPrefix(SMTPRelayConfig.Auth, "cram") {
+        SMTPRelayConfig.Auth = "cram-md5"
+        if SMTPRelayConfig.Username == "" || SMTPRelayConfig.Secret == "" {
+            return fmt.Errorf("[relay] host username or secret not set for CRAM-MD5 authentication")
+        }
+    } else {
+        return fmt.Errorf("[relay] authentication method not supported: %s", SMTPRelayConfig.Auth)
+    }
 
-	if SMTPRelayConfig.AllowedRecipients != "" {
-		re, err := regexp.Compile(SMTPRelayConfig.AllowedRecipients)
-		if err != nil {
-			return fmt.Errorf("[relay] failed to compile recipient allowlist regexp: %s", err.Error())
-		}
+    if SMTPRelayConfig.AllowedRecipients != "" {
+        re, err := regexp.Compile(SMTPRelayConfig.AllowedRecipients)
+        if err != nil {
+            return fmt.Errorf("[relay] failed to compile recipient allowlist regexp: %s", err.Error())
+        }
 
-		SMTPRelayConfig.AllowedRecipientsRegexp = re
-		logger.Log().Infof("[relay] recipient allowlist is active with the following regexp: %s", SMTPRelayConfig.AllowedRecipients)
-	}
+        SMTPRelayConfig.AllowedRecipientsRegexp = re
+        logger.Log().Infof("[relay] recipient allowlist is active with the following regexp: %s", SMTPRelayConfig.AllowedRecipients)
+    }
 
-	if SMTPRelayConfig.BlockedRecipients != "" {
-		re, err := regexp.Compile(SMTPRelayConfig.BlockedRecipients)
-		if err != nil {
-			return fmt.Errorf("[relay] failed to compile recipient blocklist regexp: %s", err.Error())
-		}
+    if SMTPRelayConfig.BlockedRecipients != "" {
+        re, err := regexp.Compile(SMTPRelayConfig.BlockedRecipients)
+        if err != nil {
+            return fmt.Errorf("[relay] failed to compile recipient blocklist regexp: %s", err.Error())
+        }
 
-		SMTPRelayConfig.BlockedRecipientsRegexp = re
-		logger.Log().Infof("[relay] recipient blocklist is active with the following regexp: %s", SMTPRelayConfig.BlockedRecipients)
-	}
+        SMTPRelayConfig.BlockedRecipientsRegexp = re
+        logger.Log().Infof("[relay] recipient blocklist is active with the following regexp: %s", SMTPRelayConfig.BlockedRecipients)
+    }
 
-	if SMTPRelayConfig.OverrideFrom != "" {
-		m, err := mail.ParseAddress(SMTPRelayConfig.OverrideFrom)
-		if err != nil {
-			return fmt.Errorf("[relay] override-from is not a valid email address: %s", SMTPRelayConfig.OverrideFrom)
-		}
+    // Add subject validation
+    if SMTPRelayConfig.AllowedSubjects != "" {
+        re, err := regexp.Compile(SMTPRelayConfig.AllowedSubjects)
+        if err != nil {
+            return fmt.Errorf("[relay] failed to compile subject allowlist regexp: %s", err.Error())
+        }
 
-		SMTPRelayConfig.OverrideFrom = m.Address
-	}
+        SMTPRelayConfig.AllowedSubjectsRegexp = re
+        logger.Log().Infof("[relay] subject allowlist is active with the following regexp: %s", SMTPRelayConfig.AllowedSubjects)
+    }
 
-	ReleaseEnabled = true
+    if SMTPRelayConfig.BlockedSubjects != "" {
+        re, err := regexp.Compile(SMTPRelayConfig.BlockedSubjects)
+        if err != nil {
+            return fmt.Errorf("[relay] failed to compile subject blocklist regexp: %s", err.Error())
+        }
 
-	logger.Log().Infof("[relay] enabling message relaying via %s:%d", SMTPRelayConfig.Host, SMTPRelayConfig.Port)
+        SMTPRelayConfig.BlockedSubjectsRegexp = re
+        logger.Log().Infof("[relay] subject blocklist is active with the following regexp: %s", SMTPRelayConfig.BlockedSubjects)
+    }
 
-	return nil
+    if SMTPRelayConfig.OverrideFrom != "" {
+        m, err := mail.ParseAddress(SMTPRelayConfig.OverrideFrom)
+        if err != nil {
+            return fmt.Errorf("[relay] override-from is not a valid email address: %s", SMTPRelayConfig.OverrideFrom)
+        }
+
+        SMTPRelayConfig.OverrideFrom = m.Address
+    }
+
+    ReleaseEnabled = true
+
+    logger.Log().Infof("[relay] enabling message relaying via %s:%d", SMTPRelayConfig.Host, SMTPRelayConfig.Port)
+
+    return nil
 }
 
 // Parse the SMTPForwardConfigFile (if set)

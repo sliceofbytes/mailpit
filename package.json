@@ -5,7 +5,7 @@
   "scripts": {
     "build": "MINIFY=true node esbuild.config.mjs",
     "watch": "WATCH=true node esbuild.config.mjs",
-    "package": "MINIFY=true node esbuild.config.mjs",
+    "package": "cross-env MINIFY=true node esbuild.config.mjs",
     "update-caniemail": "wget -O internal/htmlcheck/caniemail-data.json https://www.caniemail.com/api/data.json"
   },
   "dependencies": {
@@ -31,6 +31,7 @@
     "@types/bootstrap": "^5.2.7",
     "@types/tinycon": "^0.6.3",
     "@vue/compiler-sfc": "^3.2.37",
+    "cross-env": "^7.0.3",
     "esbuild": "^0.24.0",
     "esbuild-plugin-vue-next": "^0.1.4",
     "esbuild-sass-plugin": "^3.0.0"

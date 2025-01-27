@@ -147,6 +147,8 @@ var (
 	// SMTPAllowedRecipientsRegexp is the compiled version of SMTPAllowedRecipients
 	SMTPAllowedRecipientsRegexp *regexp.Regexp
 
+	
+
 	// POP3Listen address - if set then Mailpit will start the POP3 server and listen on this address
 	POP3Listen = "[::]:1110"
 
@@ -212,6 +214,12 @@ type SMTPRelayConfigStruct struct {
 	AllowedRecipientsRegexp *regexp.Regexp // compiled regexp using AllowedRecipients
 	BlockedRecipients       string         `yaml:"blocked-recipients"` // regex, if set prevents relating to these addresses
 	BlockedRecipientsRegexp *regexp.Regexp // compiled regexp using BlockedRecipients
+
+	AllowedSubjects       string         `yaml:"allowed-subjects"`  // regex for allowed subjects
+	AllowedSubjectsRegexp *regexp.Regexp // compiled regexp using AllowedSubjects
+	BlockedSubjects       string         `yaml:"blocked-subjects"`  // regex for blocked subjects
+	BlockedSubjectsRegexp *regexp.Regexp // compiled regexp using BlockedSubjects
+
 
 	// DEPRECATED 2024/03/12
 	RecipientAllowlist string `yaml:"recipient-allowlist"`
